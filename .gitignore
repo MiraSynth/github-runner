@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+__debug_bin*
 
 # Test binary, built with `go test -c`
 *.test
@@ -19,3 +20,9 @@
 
 # Go workspace file
 go.work
+
+# Ignore VSCODE Settings directory
+.vscode/
+
+# Ignore build directory
+build/
