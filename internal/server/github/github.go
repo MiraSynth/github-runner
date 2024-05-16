@@ -8,5 +8,5 @@ import (
 func RegisterController(routerGroup *gin.RouterGroup) {
 	githubRouterGroup := routerGroup.Group("/github")
 
-	webhook.RegisterController(githubRouterGroup, "/webhook")
+	webhook.RegisterController(githubRouterGroup)
 }

@@ -11,8 +11,8 @@ func StartServer() {
 
 	routerGroup := ginEngine.Group("/api/v1")
 
-	health.RegisterController(routerGroup, "/health")
-	github.RegisterController(routerGroup, "/github")
+	health.RegisterController(routerGroup)
+	github.RegisterController(routerGroup)
 
 	ginEngine.Run(":3038")
 }
