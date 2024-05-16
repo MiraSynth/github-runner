@@ -77,3 +77,7 @@ func GetGitHubClientId() string {
 func GetGitHubSecret() string {
 	return venv.GetString("github.secret")
 }
+
+func GetGitHubWebhookSecret() string {
+	return venv.GetString("github.webhook.secret")
+}
