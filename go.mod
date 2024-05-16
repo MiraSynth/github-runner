@@ -2,10 +2,7 @@ module mirasynth.stream/github-runner
 
 go 1.22.2
 
-require (
-	github.com/golang-jwt/jwt v3.2.2+incompatible
-	github.com/sirupsen/logrus v1.9.3
-)
+require github.com/sirupsen/logrus v1.9.3
 
 require (
 	github.com/bytedance/sonic v1.11.6 // indirect
@@ -53,7 +50,7 @@ require (
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	golang.org/x/sys v0.20.0 // indirect
