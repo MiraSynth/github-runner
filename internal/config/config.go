@@ -66,6 +66,10 @@ func verifyConfigFile() (string, error) {
 	return configFilePath, nil
 }
 
+func GetGitHubInstallationId() string {
+	return venv.GetString("github.installationid")
+}
+
 func GetGitHubClientId() string {
 	return venv.GetString("github.clientid")
 }

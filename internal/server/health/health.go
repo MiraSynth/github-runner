@@ -6,9 +6,9 @@ import (
 	"mirasynth.stream/github-runner/internal/server/health/ready"
 )
 
-func RegisterController(routerGroup *gin.RouterGroup, rootPath string) {
-	healthRouterGroup := routerGroup.Group(rootPath)
+func RegisterController(routerGroup *gin.RouterGroup) {
+	healthRouterGroup := routerGroup.Group("/health")
 
-	live.RegisterController(healthRouterGroup, "/live")
-	ready.RegisterController(healthRouterGroup, "/reaady")
+	live.RegisterController(healthRouterGroup)
+	ready.RegisterController(healthRouterGroup)
 }
