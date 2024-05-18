@@ -1,7 +1,6 @@
 package github
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,32 +20,29 @@ type GetActionRunnersRegistrationTokenOptions struct {
 	Token        string `json:"token"`
 }
 
+// GetActionRunnersRegistrationToken returns a registration token to be used when registering a self-hosted runner
+// on GitHub.
+// https://mirasynth.stream/ghapiredir#get-a-self-hosted-runner-for-a-repository
 func (c *ClientImplementation) GetActionRunnersRegistrationToken(options *GetActionRunnersRegistrationTokenOptions) (*GetActionRunnersRegistrationTokenResponse, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/runners/registration-token", options.Username, options.Repository)
 
-	request, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte("")))
+	response, err := c.startRequest(url, http.MethodPost, false, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	defaultHeadersToken(request, options.Token)
+	defer response.Body.Close()
 
-	client := &http.Client{}
-	resp, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
+	if response.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("github action runner registration token could not be fetched")
 	}
 
 	var result *GetActionRunnersRegistrationTokenResponse
-	resultBytes, err := io.ReadAll(resp.Body)
+	resultBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
+
 	err = json.Unmarshal(resultBytes, result)
 	if err != nil {
 		return nil, err
