@@ -2,23 +2,31 @@ package github
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"time"
 )
 
-type ActionRunnersRegistrationTokenOptions struct {
+type GetActionRunnersRegistrationTokenResponse struct {
+	Token     string    `json:"token"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+type GetActionRunnersRegistrationTokenOptions struct {
 	Username     string `json:"username"`
 	Organization string `json:"organization"`
 	Repository   string `json:"repository"`
 	Token        string `json:"token"`
 }
 
-func GetActionRunnersRegistrationToken(options *ActionRunnersRegistrationTokenOptions) (bool, error) {
+func (c *ClientImplementation) GetActionRunnersRegistrationToken(options *GetActionRunnersRegistrationTokenOptions) (*GetActionRunnersRegistrationTokenResponse, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/runners/registration-token", options.Username, options.Repository)
 
 	request, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte("")))
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	defaultHeadersToken(request, options.Token)
@@ -26,13 +34,23 @@ func GetActionRunnersRegistrationToken(options *ActionRunnersRegistrationTokenOp
 	client := &http.Client{}
 	resp, err := client.Do(request)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("installation token could not be fetched")
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("github action runner registration token could not be fetched")
 	}
 
-	return true, err
+	var result *GetActionRunnersRegistrationTokenResponse
+	resultBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(resultBytes, result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, err
 }

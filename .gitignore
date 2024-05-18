@@ -24,5 +24,8 @@ go.work
 # Ignore VSCODE Settings directory
 .vscode/
 
+# Ignore JetBrains Settings directory
+.idea/
+
 # Ignore build directory
 build/
