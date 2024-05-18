@@ -3,6 +3,7 @@ package github
 import (
 	"fmt"
 	"mirasynth.stream/github-runner/internal/config"
+	"mirasynth.stream/github-runner/internal/version"
 	"net/http"
 	"runtime"
 )
@@ -10,7 +11,7 @@ import (
 func defaultHeaders(request *http.Request) {
 	request.Header.Set("Accept", "Accept")
 	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	request.Header.Set("User-Agent", fmt.Sprintf("mirasynth/0.0.0-alpha GoLang/%s (%s; %s)", runtime.Version(), runtime.GOOS, runtime.GOARCH))
+	request.Header.Set("User-Agent", fmt.Sprintf("mirasynth/%s GoLang/%s (%s; %s)", version.GetVersion(), runtime.Version(), runtime.GOOS, runtime.GOARCH))
 	request.Header.Set("Content-Type", "application/json")
 }
 
