@@ -2,6 +2,16 @@ package github
 
 import "time"
 
+type ClientRepository string
+type ClientPermissionScope string
+type ClientPermissionType string
+type ClientPermissions map[ClientPermissionScope]ClientPermissionType
+
+type ClientToken struct {
+	token          string
+	tokenExpiresAt time.Time
+}
+
 type Permissions struct {
 	Issues   string `json:"issues"`
 	Contents string `json:"contents"`
