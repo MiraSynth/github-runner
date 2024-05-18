@@ -3,7 +3,6 @@ package github
 import (
 	"fmt"
 	"mirasynth.stream/github-runner/internal/config"
-	"mirasynth.stream/github-runner/internal/utils/generate_jwt"
 	"net/http"
 	"runtime"
 )
@@ -18,7 +17,7 @@ func defaultHeaders(request *http.Request) {
 func (c *ClientImplementation) defaultHeadersJWT(request *http.Request) error {
 	defaultHeaders(request)
 
-	jwt, err := generate_jwt.Generate(config.GetGitHubClientId(), config.GetGitHubSecret())
+	jwt, err := generateJwt(config.GetGitHubClientId(), config.GetGitHubSecret())
 	if err != nil {
 		return err
 	}

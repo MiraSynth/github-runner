@@ -1,4 +1,4 @@
-package generate_jwt
+package github
 
 import (
 	"time"
@@ -6,7 +6,7 @@ import (
 	jwt "github.com/golang-jwt/jwt/v5"
 )
 
-func Generate(clientId string, secretKey string) (string, error) {
+func generateJwt(clientId string, secretKey string) (string, error) {
 	claims := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"iss": clientId,
 		"exp": time.Now().Add(600 * time.Second).Unix(),
