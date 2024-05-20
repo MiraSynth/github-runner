@@ -141,3 +141,8 @@ type Repository struct {
 	OpenIssues          int                   `json:"open_issues"`
 	Watchers            int                   `json:"watchers"`
 }
+
+type Error struct {
+	Message          string `json:"message"`
+	DocumentationUrl string `json:"documentation_url"`
+}

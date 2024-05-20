@@ -1,9 +1,7 @@
 package github
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 )
@@ -28,29 +26,22 @@ type GetInstallationAccessTokenOptions struct {
 // GetInstallationAccessToken returns an access token and the time it expires
 // https://mirasynth.stream/ghapiredir#create-an-installation-access-token-for-an-app
 func (c *ClientImplementation) GetInstallationAccessToken(options *GetInstallationAccessTokenOptions) (*GetInstallationAccessTokenResponse, error) {
+
 	url := fmt.Sprintf("https://api.github.com/app/installations/%d/access_tokens", c.installationId)
 
-	response, err := c.startRequest(url, http.MethodPost, true, options.RequestData)
+	result, err := startRequest[GetInstallationAccessTokenResponse](c, &startRequestOptions{
+		URL:      url,
+		Method:   http.MethodPost,
+		UseToken: true,
+		StatusCodes: map[int]statusCode{
+			http.StatusCreated: {},
+			defaultStatusCode: {
+				ErrorMessage: "installation token could not be fetched",
+			},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("installation token could not be fetched")
-	}
-
-	var result *GetInstallationAccessTokenResponse
-	resultBytes, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(resultBytes, result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, err
+	return result, nil
 }

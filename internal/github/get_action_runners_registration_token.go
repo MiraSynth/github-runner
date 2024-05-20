@@ -1,9 +1,7 @@
 package github
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 )
@@ -26,27 +24,31 @@ type GetActionRunnersRegistrationTokenOptions struct {
 func (c *ClientImplementation) GetActionRunnersRegistrationToken(options *GetActionRunnersRegistrationTokenOptions) (*GetActionRunnersRegistrationTokenResponse, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/runners/registration-token", options.Username, options.Repository)
 
-	response, err := c.startRequest(url, http.MethodPost, false, nil)
+	result, err := startRequest[GetActionRunnersRegistrationTokenResponse](c, &startRequestOptions{
+		URL:      url,
+		Method:   http.MethodPost,
+		UseToken: false,
+		StatusCodes: map[int]statusCode{
+			http.StatusOK: {},
+			http.StatusUnauthorized: {
+				"the authorization details provided where invalid",
+			},
+			http.StatusForbidden: {
+				"the request was forbidden",
+			},
+			http.StatusNotFound: {
+				"the resource being requested was not found",
+			},
+			http.StatusUnprocessableEntity: {
+				"the entity could not be processed, see additional error for information",
+			},
+			defaultStatusCode: {
+				"github action runner registration token could not be fetched",
+			},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("github action runner registration token could not be fetched")
-	}
-
-	var result *GetActionRunnersRegistrationTokenResponse
-	resultBytes, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(resultBytes, result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, err
+	return result, nil
 }
