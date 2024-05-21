@@ -2,6 +2,7 @@ package github
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,12 +14,21 @@ const (
 	defaultStatusCode = 0
 )
 
+var backoffSchedule = []time.Duration{
+	1 * time.Second,
+	3 * time.Second,
+	10 * time.Second,
+	37 * time.Second,
+	101 * time.Second,
+}
+
 type Client interface {
 	GetInstallationAccessToken(*GetInstallationAccessTokenOptions) (*GetInstallationAccessTokenResponse, error)
 	GetActionRunnersRegistrationToken(*GetActionRunnersRegistrationTokenOptions) (*GetActionRunnersRegistrationTokenResponse, error)
 
+	ListUserRepositories(*ListUserRepositoriesOptions) (*ListUserRepositoriesResponse, error)
+
 	refreshToken() error
-	startRequest(options *startRequestOptions) (*http.Response, error)
 	defaultHeadersJWT(request *http.Request) error
 	defaultHeadersToken(request *http.Request) error
 }
@@ -94,15 +104,41 @@ type statusCode struct {
 	ErrorMessage string
 }
 
+type pagination struct {
+	PerPage   int
+	StartPage int
+}
+
 type startRequestOptions struct {
 	URL         string
 	Method      string
 	UseToken    bool
 	RequestData any
 	StatusCodes map[int]statusCode
+	Pagination  pagination
 }
 
-func (c *ClientImplementation) startRequest(options *startRequestOptions) (*http.Response, error) {
+type startRequestReturn[T any] struct {
+	Result T
+	Error  error
+}
+
+func startRequest[T any](c *ClientImplementation, options *startRequestOptions) (*T, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	channel := make(chan startRequestReturn[*T])
+	go func() {
+		result, err := startRequestSync[T](c, options)
+		finalResult := startRequestReturn[*T]{
+			Result: result,
+			Error:  err,
+		}
+		channel <- finalResult
+	}()
+	result := <-channel
+	return result.Result, result.Error
+}
+
+func startRequestSync[T any](c *ClientImplementation, options *startRequestOptions) (*T, error) {
 	optionsBytes, err := json.Marshal(options.RequestData)
 	if err != nil {
 		return nil, err
@@ -123,37 +159,38 @@ func (c *ClientImplementation) startRequest(options *startRequestOptions) (*http
 		return nil, err
 	}
 
-	client := &http.Client{}
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
+	var response *http.Response
+	for _, backoff := range backoffSchedule {
+		err = nil
+		client := &http.Client{}
+		response, err = client.Do(request)
+		if err != nil {
+			return nil, err
+		}
+
+		statusCodeBehaviour, ok := options.StatusCodes[response.StatusCode]
+		if !ok {
+			statusCodeBehaviour, ok = options.StatusCodes[defaultStatusCode]
+		}
+		if !ok {
+			statusCodeBehaviour = statusCode{
+				ErrorMessage: "an error has occurred",
+			}
+		}
+
+		if len(statusCodeBehaviour.ErrorMessage) > 0 {
+			err = handleError(response, &statusCodeBehaviour)
+			time.Sleep(backoff)
+			continue
+		}
+
 	}
 
-	return response, nil
-}
-
-func startRequest[T any](c *ClientImplementation, options *startRequestOptions) (*T, error) {
-	response, err := c.startRequest(options)
-	if err != nil {
+	if response == nil || err != nil {
 		return nil, err
 	}
 
 	defer response.Body.Close()
-
-	statusCodeBehaviour, ok := options.StatusCodes[response.StatusCode]
-	if !ok {
-		statusCodeBehaviour, ok = options.StatusCodes[defaultStatusCode]
-	}
-	if !ok {
-		statusCodeBehaviour = statusCode{
-			ErrorMessage: "an error has occurred",
-		}
-	}
-
-	if len(statusCodeBehaviour.ErrorMessage) > 0 {
-		err = handleError(response, &statusCodeBehaviour)
-		return nil, err
-	}
 
 	var result T
 	resultBytes, err := io.ReadAll(response.Body)
@@ -170,6 +207,8 @@ func startRequest[T any](c *ClientImplementation, options *startRequestOptions) 
 }
 
 func handleError(response *http.Response, options *statusCode) error {
+	defer response.Body.Close()
+
 	var result Error
 	resultBytes, err := io.ReadAll(response.Body)
 	if err != nil {

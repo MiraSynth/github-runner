@@ -53,6 +53,16 @@ type Owner struct {
 	SiteAdmin         bool   `json:"site_admin"`
 }
 
+type SecurityAndAnalysisStatus struct {
+	Status string `json:"status"`
+}
+
+type SecurityAndAnalysis struct {
+	AdvancedSecurity             SecurityAndAnalysisStatus `json:"advanced_security"`
+	SecretScanning               SecurityAndAnalysisStatus `json:"secret_scanning"`
+	SecretScanningPushProtection SecurityAndAnalysisStatus `json:"secret_scanning_push_protection"`
+}
+
 type Repository struct {
 	Id                  int                   `json:"id"`
 	NodeId              string                `json:"node_id"`
@@ -140,6 +150,7 @@ type Repository struct {
 	Forks               int                   `json:"forks"`
 	OpenIssues          int                   `json:"open_issues"`
 	Watchers            int                   `json:"watchers"`
+	SecurityAndAnalysis SecurityAndAnalysis   `json:"security_and_analysis"`
 }
 
 type Error struct {
