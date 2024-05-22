@@ -19,7 +19,7 @@ type Options struct {
 	Environment []string `json:"environment"`
 }
 
-func StartImage(options *Options) error {
+func Start(options *Options) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -39,25 +39,16 @@ func StartImage(options *Options) error {
 		Entrypoint: options.Entrypoint,
 		Env:        options.Environment,
 	}
-	resp, err := cli.ContainerCreate(ctx, containerConfig, nil, nil, nil, options.Name)
+	createResponse, err := cli.ContainerCreate(ctx, containerConfig, nil, nil, nil, options.Name)
 	if err != nil {
 		return err
 	}
 
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if err := cli.ContainerStart(ctx, createResponse.ID, container.StartOptions{}); err != nil {
 		return err
 	}
 
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			return err
-		}
-	case <-statusCh:
-	}
-
-	out, err := cli.ContainerLogs(ctx, resp.ID, container.LogsOptions{ShowStdout: true})
+	out, err := cli.ContainerLogs(ctx, createResponse.ID, container.LogsOptions{ShowStdout: true, Follow: true})
 	if err != nil {
 		return err
 	}

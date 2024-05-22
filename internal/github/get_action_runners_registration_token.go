@@ -24,7 +24,7 @@ type GetActionRunnersRegistrationTokenOptions struct {
 func (c *ClientImplementation) GetActionRunnersRegistrationToken(options *GetActionRunnersRegistrationTokenOptions) (*GetActionRunnersRegistrationTokenResponse, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/runners/registration-token", options.Username, options.Repository)
 
-	result, err := startRequest[GetActionRunnersRegistrationTokenResponse](c, &startRequestOptions{
+	return startRequest(c, &startRequestOptions[GetActionRunnersRegistrationTokenResponse]{
 		URL:      url,
 		Method:   http.MethodPost,
 		UseToken: false,
@@ -47,8 +47,4 @@ func (c *ClientImplementation) GetActionRunnersRegistrationToken(options *GetAct
 			},
 		},
 	})
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
 }

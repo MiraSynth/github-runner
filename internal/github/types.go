@@ -153,6 +153,21 @@ type Repository struct {
 	SecurityAndAnalysis SecurityAndAnalysis   `json:"security_and_analysis"`
 }
 
+type Label struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type Runner struct {
+	Id     int     `json:"id"`
+	Name   string  `json:"name"`
+	Os     string  `json:"os"`
+	Status string  `json:"status"`
+	Busy   bool    `json:"busy"`
+	Labels []Label `json:"labels"`
+}
+
 type Error struct {
 	Message          string `json:"message"`
 	DocumentationUrl string `json:"documentation_url"`

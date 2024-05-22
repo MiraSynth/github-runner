@@ -21,7 +21,7 @@ WORKDIR /actions-runner
 RUN groupadd --gid $USER_GID $USERNAME
 RUN useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
 
-COPY ../../runner.sh ./runner.sh
+COPY runner.sh ./runner.sh
 RUN chmod +x ./runner.sh
 
 RUN chown -R $USERNAME:$USERNAME /actions-runner

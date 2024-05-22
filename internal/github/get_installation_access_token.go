@@ -26,10 +26,9 @@ type GetInstallationAccessTokenOptions struct {
 // GetInstallationAccessToken returns an access token and the time it expires
 // https://mirasynth.stream/ghapiredir#create-an-installation-access-token-for-an-app
 func (c *ClientImplementation) GetInstallationAccessToken(options *GetInstallationAccessTokenOptions) (*GetInstallationAccessTokenResponse, error) {
-
 	url := fmt.Sprintf("https://api.github.com/app/installations/%d/access_tokens", c.installationId)
 
-	result, err := startRequest[GetInstallationAccessTokenResponse](c, &startRequestOptions{
+	return startRequest(c, &startRequestOptions[GetInstallationAccessTokenResponse]{
 		URL:      url,
 		Method:   http.MethodPost,
 		UseToken: true,
@@ -40,8 +39,4 @@ func (c *ClientImplementation) GetInstallationAccessToken(options *GetInstallati
 			},
 		},
 	})
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
 }

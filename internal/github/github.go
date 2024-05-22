@@ -42,11 +42,13 @@ type ClientImplementation struct {
 	options        *ClientOptions
 	auth           *ClientToken
 	installationId int
+	context        context.Context
 }
 
-func CreateClient(options *ClientOptions) (Client, error) {
+func CreateClient(ctx context.Context, options *ClientOptions) (Client, error) {
 	client := ClientImplementation{
 		options: options,
+		context: ctx,
 	}
 
 	err := validateClientOptions(options)
@@ -104,50 +106,100 @@ type statusCode struct {
 	ErrorMessage string
 }
 
-type pagination struct {
-	PerPage   int
-	StartPage int
+type pagination[T any] struct {
+	PerPage     int
+	StartPage   int
+	PageReducer func(accumulator T, result T) *T
 }
 
-type startRequestOptions struct {
+type startRequestOptions[T any] struct {
 	URL         string
 	Method      string
 	UseToken    bool
 	RequestData any
 	StatusCodes map[int]statusCode
-	Pagination  pagination
+	Pagination  *pagination[T]
 }
 
-type startRequestReturn[T any] struct {
-	Result T
-	Error  error
-}
+func startRequest[T any](c *ClientImplementation, options *startRequestOptions[T]) (*T, error) {
+	requestDataBytes, err := json.Marshal(options.RequestData)
+	if err != nil {
+		return nil, err
+	}
 
-func startRequest[T any](c *ClientImplementation, options *startRequestOptions) (*T, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	channel := make(chan startRequestReturn[*T])
-	go func() {
-		result, err := startRequestSync[T](c, options)
-		finalResult := startRequestReturn[*T]{
-			Result: result,
-			Error:  err,
+	var returnResult *T
+
+	var response *http.Response
+	for {
+		for _, backoff := range backoffSchedule {
+			response, err = singleRequest(c, options, &requestDataBytes)
+
+			if response == nil {
+				return nil, err
+			}
+
+			statusCodeBehaviour, ok := options.StatusCodes[response.StatusCode]
+			if !ok {
+				statusCodeBehaviour, ok = options.StatusCodes[defaultStatusCode]
+			}
+			if !ok {
+				statusCodeBehaviour = statusCode{
+					ErrorMessage: "an error has occurred",
+				}
+			}
+
+			if len(statusCodeBehaviour.ErrorMessage) <= 0 {
+				break
+			}
+
+			err = handleError(response, &statusCodeBehaviour)
+			time.Sleep(backoff)
 		}
-		channel <- finalResult
-	}()
-	result := <-channel
-	return result.Result, result.Error
+
+		if response == nil || err != nil {
+			return nil, err
+		}
+
+		var result T
+		resultBytes, resultBytesErr := io.ReadAll(response.Body)
+		err = resultBytesErr
+		if err != nil {
+			response.Body.Close()
+			return nil, err
+		}
+
+		err = json.Unmarshal(resultBytes, &result)
+		if err != nil {
+			response.Body.Close()
+			return nil, err
+		}
+
+		if options.Pagination == nil {
+			response.Body.Close()
+			return &result, err
+		}
+
+		pageReducerResult := options.Pagination.PageReducer(*returnResult, result)
+		if pageReducerResult != nil {
+			returnResult = pageReducerResult
+			response.Body.Close()
+			return returnResult, nil
+		}
+
+		response.Body.Close()
+		return returnResult, nil
+	}
 }
 
-func startRequestSync[T any](c *ClientImplementation, options *startRequestOptions) (*T, error) {
-	optionsBytes, err := json.Marshal(options.RequestData)
+func singleRequest[T any](c *ClientImplementation, options *startRequestOptions[T], requestDataBytes *[]byte) (*http.Response, error) {
+	request, err := http.NewRequest(options.Method, options.URL, bytes.NewBuffer(*requestDataBytes))
 	if err != nil {
 		return nil, err
 	}
 
-	request, err := http.NewRequest(options.Method, options.URL, bytes.NewBuffer(optionsBytes))
-	if err != nil {
-		return nil, err
-	}
+	deadlineContext, cancel := context.WithTimeout(c.context, time.Second*5)
+	defer cancel()
+	request.WithContext(deadlineContext)
 
 	if options.UseToken {
 		err = c.defaultHeadersJWT(request)
@@ -159,51 +211,8 @@ func startRequestSync[T any](c *ClientImplementation, options *startRequestOptio
 		return nil, err
 	}
 
-	var response *http.Response
-	for _, backoff := range backoffSchedule {
-		err = nil
-		client := &http.Client{}
-		response, err = client.Do(request)
-		if err != nil {
-			return nil, err
-		}
-
-		statusCodeBehaviour, ok := options.StatusCodes[response.StatusCode]
-		if !ok {
-			statusCodeBehaviour, ok = options.StatusCodes[defaultStatusCode]
-		}
-		if !ok {
-			statusCodeBehaviour = statusCode{
-				ErrorMessage: "an error has occurred",
-			}
-		}
-
-		if len(statusCodeBehaviour.ErrorMessage) > 0 {
-			err = handleError(response, &statusCodeBehaviour)
-			time.Sleep(backoff)
-			continue
-		}
-
-	}
-
-	if response == nil || err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-
-	var result T
-	resultBytes, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(resultBytes, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return &result, err
+	client := &http.Client{}
+	return client.Do(request)
 }
 
 func handleError(response *http.Response, options *statusCode) error {
