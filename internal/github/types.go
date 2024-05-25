@@ -8,13 +8,20 @@ type ClientPermissionType string
 type ClientPermissions map[ClientPermissionScope]ClientPermissionType
 
 type ClientToken struct {
-	token          string
-	tokenExpiresAt time.Time
+	Token          string
+	TokenExpiresAt time.Time
 }
 
 type Permissions struct {
 	Issues   string `json:"issues"`
 	Contents string `json:"contents"`
+}
+
+type InstallationPermissions struct {
+	Metadata   string `json:"metadata"`
+	Contents   string `json:"contents"`
+	Issues     string `json:"issues"`
+	SingleFile string `json:"single_file"`
 }
 
 type RepositoryPermissions struct {
@@ -151,6 +158,27 @@ type Repository struct {
 	OpenIssues          int                   `json:"open_issues"`
 	Watchers            int                   `json:"watchers"`
 	SecurityAndAnalysis SecurityAndAnalysis   `json:"security_and_analysis"`
+}
+
+type Account struct {
+	Login             string `json:"login"`
+	Id                int    `json:"id"`
+	NodeId            string `json:"node_id"`
+	AvatarUrl         string `json:"avatar_url"`
+	GravatarId        string `json:"gravatar_id"`
+	Url               string `json:"url"`
+	HtmlUrl           string `json:"html_url"`
+	FollowersUrl      string `json:"followers_url"`
+	FollowingUrl      string `json:"following_url"`
+	GistsUrl          string `json:"gists_url"`
+	StarredUrl        string `json:"starred_url"`
+	SubscriptionsUrl  string `json:"subscriptions_url"`
+	OrganizationsUrl  string `json:"organizations_url"`
+	ReposUrl          string `json:"repos_url"`
+	EventsUrl         string `json:"events_url"`
+	ReceivedEventsUrl string `json:"received_events_url"`
+	Type              string `json:"type"`
+	SiteAdmin         bool   `json:"site_admin"`
 }
 
 type Label struct {

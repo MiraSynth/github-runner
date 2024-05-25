@@ -19,7 +19,7 @@ func (c *ClientImplementation) ListUserRepositories(options *ListUserRepositorie
 	return startRequest(c, &startRequestOptions[ListUserRepositoriesResponse]{
 		URL:      url,
 		Method:   http.MethodGet,
-		UseToken: false,
+		UseToken: true,
 		StatusCodes: map[int]statusCode{
 			http.StatusOK: {},
 			defaultStatusCode: {

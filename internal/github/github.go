@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mirasynth.stream/github-runner/internal/config"
 	"net/http"
 	"time"
 )
@@ -13,6 +14,8 @@ import (
 const (
 	defaultStatusCode = 0
 )
+
+var instance *ClientImplementation
 
 var backoffSchedule = []time.Duration{
 	1 * time.Second,
@@ -23,8 +26,12 @@ var backoffSchedule = []time.Duration{
 }
 
 type Client interface {
-	GetInstallationAccessToken(*GetInstallationAccessTokenOptions) (*GetInstallationAccessTokenResponse, error)
+	GetAuthenticatedApp(*GetAuthenticatedAppOptions) (*GetAuthenticatedAppResponse, error)
+	CreateInstallationAccessTokenForApp(*CreateInstallationAccessTokenForAppOptions) (*CreateInstallationAccessTokenForAppResponse, error)
 	GetActionRunnersRegistrationToken(*GetActionRunnersRegistrationTokenOptions) (*GetActionRunnersRegistrationTokenResponse, error)
+
+	GetInstallationForAuthenticatedApp(*GetInstallationForAuthenticatedAppOptions) (*GetInstallationForAuthenticatedAppResponse, error)
+	ListInstallationsForAuthenticatedApp(*ListInstallationsForAuthenticatedAppOptions) (*ListInstallationsForAuthenticatedAppResponse, error)
 
 	ListUserRepositories(*ListUserRepositoriesOptions) (*ListUserRepositoriesResponse, error)
 
@@ -35,20 +42,33 @@ type Client interface {
 
 type ClientOptions struct {
 	Repositories []ClientRepository `json:"repositories"`
-	Permissions  ClientPermissions  `json:"permissions"`
+}
+
+type ClientInstallation struct {
+	Id          int
+	Permissions ClientPermissions
 }
 
 type ClientImplementation struct {
-	options        *ClientOptions
-	auth           *ClientToken
-	installationId int
-	context        context.Context
+	options      *ClientOptions
+	auth         *ClientToken
+	installation *ClientInstallation
+	context      context.Context
 }
 
-func CreateClient(ctx context.Context, options *ClientOptions) (Client, error) {
-	client := ClientImplementation{
-		options: options,
-		context: ctx,
+func GetClient(ctx context.Context, options *ClientOptions) (Client, error) {
+	if instance != nil && options == nil {
+		return instance, nil
+	}
+
+	if options == nil {
+		options = &ClientOptions{}
+	}
+
+	instance = &ClientImplementation{
+		options:      options,
+		context:      ctx,
+		installation: &ClientInstallation{},
 	}
 
 	err := validateClientOptions(options)
@@ -56,12 +76,29 @@ func CreateClient(ctx context.Context, options *ClientOptions) (Client, error) {
 		return nil, err
 	}
 
-	err = client.refreshToken()
+	authenticatedApps, err := instance.ListInstallationsForAuthenticatedApp(&ListInstallationsForAuthenticatedAppOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	return &client, nil
+	for _, authenticatedApp := range *authenticatedApps {
+		if authenticatedApp.AppId == config.GetGitHubAppId() {
+			instance.installation.Id = authenticatedApp.Id
+			instance.installation.Permissions = authenticatedApp.Permissions
+			break
+		}
+	}
+
+	if instance.installation.Id == 0 {
+		return nil, fmt.Errorf("app no installed")
+	}
+
+	err = instance.refreshToken()
+	if err != nil {
+		return nil, err
+	}
+
+	return instance, nil
 }
 
 func validateClientOptions(options *ClientOptions) error {
@@ -69,26 +106,18 @@ func validateClientOptions(options *ClientOptions) error {
 		return fmt.Errorf("options argument must be provided to the client")
 	}
 
-	if options.Repositories == nil || len(options.Repositories) < 1 {
-		return fmt.Errorf("you must provide atleast one repository in the options argument")
-	}
-
-	if options.Permissions == nil || len(options.Permissions) < 1 {
-		return fmt.Errorf("you must provide atleast one permission in the options argument")
-	}
-
 	return nil
 }
 
 func (c *ClientImplementation) refreshToken() error {
-	if c.auth.tokenExpiresAt.After(time.Now()) {
+	if c.auth != nil && c.auth.TokenExpiresAt.After(time.Now()) {
 		return nil
 	}
 
-	response, err := c.GetInstallationAccessToken(&GetInstallationAccessTokenOptions{
-		RequestData: &GetActionRunnersRegistrationTokenRequest{
+	response, err := c.CreateInstallationAccessTokenForApp(&CreateInstallationAccessTokenForAppOptions{
+		RequestData: &CreateInstallationAccessTokenForAppRequest{
 			Repositories: c.options.Repositories,
-			Permissions:  c.options.Permissions,
+			Permissions:  c.installation.Permissions,
 		},
 	})
 
@@ -96,8 +125,12 @@ func (c *ClientImplementation) refreshToken() error {
 		return err
 	}
 
-	c.auth.token = response.Token
-	c.auth.tokenExpiresAt = response.ExpiresAt
+	if c.auth == nil {
+		c.auth = &ClientToken{}
+	}
+
+	c.auth.Token = response.Token
+	c.auth.TokenExpiresAt = response.ExpiresAt
 
 	return nil
 }
@@ -122,12 +155,16 @@ type startRequestOptions[T any] struct {
 }
 
 func startRequest[T any](c *ClientImplementation, options *startRequestOptions[T]) (*T, error) {
-	requestDataBytes, err := json.Marshal(options.RequestData)
-	if err != nil {
-		return nil, err
+	var requestDataBytes []byte
+	var err error
+	if options.RequestData != nil {
+		requestDataBytes, err = json.Marshal(options.RequestData)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	var returnResult *T
+	var returnResult T
 
 	var response *http.Response
 	for {
@@ -148,7 +185,8 @@ func startRequest[T any](c *ClientImplementation, options *startRequestOptions[T
 				}
 			}
 
-			if len(statusCodeBehaviour.ErrorMessage) <= 0 {
+			strLen := len(statusCodeBehaviour.ErrorMessage)
+			if strLen == 0 {
 				break
 			}
 
@@ -179,15 +217,16 @@ func startRequest[T any](c *ClientImplementation, options *startRequestOptions[T
 			return &result, err
 		}
 
-		pageReducerResult := options.Pagination.PageReducer(*returnResult, result)
+		pageReducerResult := options.Pagination.PageReducer(returnResult, result)
 		if pageReducerResult != nil {
-			returnResult = pageReducerResult
+			returnResult = *pageReducerResult
 			response.Body.Close()
-			return returnResult, nil
+			options.Pagination.StartPage++
+			continue
 		}
 
 		response.Body.Close()
-		return returnResult, nil
+		return &returnResult, nil
 	}
 }
 
@@ -202,13 +241,20 @@ func singleRequest[T any](c *ClientImplementation, options *startRequestOptions[
 	request.WithContext(deadlineContext)
 
 	if options.UseToken {
-		err = c.defaultHeadersJWT(request)
-	} else {
 		err = c.defaultHeadersToken(request)
+	} else {
+		err = c.defaultHeadersJWT(request)
 	}
 
 	if err != nil {
 		return nil, err
+	}
+
+	if options.Pagination != nil {
+		query := request.URL.Query()
+		query.Add("page", fmt.Sprintf("%d", options.Pagination.StartPage))
+		query.Add("per_page", fmt.Sprintf("%d", options.Pagination.PerPage))
+		request.URL.RawQuery = query.Encode()
 	}
 
 	client := &http.Client{}

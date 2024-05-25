@@ -23,7 +23,7 @@ func (c *ClientImplementation) ListSelfHostedRunnersForRepository(options *LList
 	return startRequest(c, &startRequestOptions[ListSelfHostedRunnersForRepositoryResponse]{
 		URL:      url,
 		Method:   http.MethodGet,
-		UseToken: false,
+		UseToken: true,
 		StatusCodes: map[int]statusCode{
 			http.StatusOK: {},
 			defaultStatusCode: {

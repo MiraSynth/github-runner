@@ -18,7 +18,7 @@ func defaultHeaders(request *http.Request) {
 func (c *ClientImplementation) defaultHeadersJWT(request *http.Request) error {
 	defaultHeaders(request)
 
-	jwt, err := generateJwt(config.GetGitHubClientId(), config.GetGitHubSecret())
+	jwt, err := generateJwt(config.GetGitHubClientId(), config.GetGitHubKey())
 	if err != nil {
 		return err
 	}
@@ -36,6 +36,6 @@ func (c *ClientImplementation) defaultHeadersToken(request *http.Request) error 
 		return err
 	}
 
-	request.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.auth.token))
+	request.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.auth.Token))
 	return nil
 }

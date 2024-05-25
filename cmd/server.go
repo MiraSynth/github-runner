@@ -6,7 +6,7 @@ import (
 	"mirasynth.stream/github-runner/internal/server"
 )
 
-func NewServerhCmd() *cobra.Command {
+func NewServerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: atlas.SERVER_COMMAND_SHORT_DESC,

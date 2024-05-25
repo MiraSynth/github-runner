@@ -27,7 +27,7 @@ func (c *ClientImplementation) GetActionRunnersRegistrationToken(options *GetAct
 	return startRequest(c, &startRequestOptions[GetActionRunnersRegistrationTokenResponse]{
 		URL:      url,
 		Method:   http.MethodPost,
-		UseToken: false,
+		UseToken: true,
 		StatusCodes: map[int]statusCode{
 			http.StatusOK: {},
 			http.StatusUnauthorized: {

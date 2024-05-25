@@ -9,6 +9,11 @@
 *.dylib
 __debug_bin*
 
+# Secret Files
+.pem
+*-config.yaml
+*-conifg.yml
+
 # Test binary, built with `go test -c`
 *.test
 
