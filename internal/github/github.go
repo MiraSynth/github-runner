@@ -198,12 +198,20 @@ func startRequest[T any](c *ClientImplementation, options *startRequestOptions[T
 			return nil, err
 		}
 
+		if response.StatusCode == http.StatusNoContent {
+			return &returnResult, nil
+		}
+
 		var result T
 		resultBytes, resultBytesErr := io.ReadAll(response.Body)
 		err = resultBytesErr
 		if err != nil {
 			response.Body.Close()
 			return nil, err
+		}
+
+		if len(resultBytes) == 0 {
+			return &returnResult, nil
 		}
 
 		err = json.Unmarshal(resultBytes, &result)

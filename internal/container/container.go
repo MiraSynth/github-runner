@@ -1,7 +1,9 @@
 package container
 
 import (
+	"bytes"
 	"context"
+	"github.com/docker/docker/api/types"
 	"io"
 	"os"
 
@@ -54,6 +56,24 @@ func Start(options *Options) error {
 	}
 
 	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+
+	return nil
+}
+
+func Build() error {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
+
+	buildContextRaw := make([]byte, 0)
+	buildContext := bytes.NewReader(buildContextRaw)
+	imageBuildResponse, err := cli.ImageBuild(ctx, buildContext, types.ImageBuildOptions{})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
