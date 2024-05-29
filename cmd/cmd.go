@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"mirasynth.stream/github-runner/internal/config"
+	"mirasynth.stream/github-runner/internal/container"
 	"mirasynth.stream/github-runner/internal/github"
 	"os"
 
@@ -26,6 +27,25 @@ func init() {
 			log.SetLevel(log.DebugLevel)
 
 			err := config.SetupConfig(configFilePath)
+			if err != nil {
+				return err
+			}
+
+			containerClient, err := container.New()
+			containerId, err := containerClient.Create(cmd.Context(), &container.Options{
+				Name:      "runner-test",
+				ImageName: "miras-github-runner:alpha",
+				Environment: []string{
+					"GITHUB_RUNNER_REPOSITORY", "",
+					"GITHUB_RUNNER_TOKEN", "",
+					"GITHUB_RUNNER_LABELS", "",
+				},
+			})
+			if err != nil {
+				return err
+			}
+
+			err = containerClient.Start(cmd.Context(), containerId)
 			if err != nil {
 				return err
 			}

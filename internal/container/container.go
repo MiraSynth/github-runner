@@ -1,11 +1,10 @@
 package container
 
 import (
-	"bytes"
 	"context"
-	"github.com/docker/docker/api/types"
 	"io"
 	"os"
+	"runtime"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -21,19 +20,46 @@ type Options struct {
 	Environment []string `json:"environment"`
 }
 
-func Start(options *Options) error {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return err
-	}
-	defer cli.Close()
+type Container interface {
+	Create(context.Context, *Options) (string, error)
+	Start(context.Context, string) error
+}
 
-	reader, err := cli.ImagePull(ctx, options.ImageName, image.PullOptions{})
+type implementation struct {
+	client *client.Client
+}
+
+func New() (Container, error) {
+	c, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	io.Copy(os.Stdout, reader)
+
+	impl := &implementation{
+		client: c,
+	}
+
+	runtime.SetFinalizer(impl, func(impl implementation) {
+		if impl.client == nil {
+			return
+		}
+
+		defer impl.client.Close()
+	})
+
+	return impl, nil
+}
+
+func (c *implementation) Create(ctx context.Context, options *Options) (string, error) {
+	reader, err := c.client.ImagePull(ctx, options.ImageName, image.PullOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	_, err = io.Copy(os.Stdout, reader)
+	if err != nil {
+		return "", err
+	}
 
 	containerConfig := &container.Config{
 		Image:      options.ImageName,
@@ -41,36 +67,28 @@ func Start(options *Options) error {
 		Entrypoint: options.Entrypoint,
 		Env:        options.Environment,
 	}
-	createResponse, err := cli.ContainerCreate(ctx, containerConfig, nil, nil, nil, options.Name)
+	createResponse, err := c.client.ContainerCreate(ctx, containerConfig, nil, nil, nil, options.Name)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	if err := cli.ContainerStart(ctx, createResponse.ID, container.StartOptions{}); err != nil {
-		return err
-	}
-
-	out, err := cli.ContainerLogs(ctx, createResponse.ID, container.LogsOptions{ShowStdout: true, Follow: true})
-	if err != nil {
-		return err
-	}
-
-	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
-
-	return nil
+	return createResponse.ID, nil
 }
 
-func Build() error {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+func (c *implementation) Start(ctx context.Context, containerId string) error {
+	containerStartOptions := container.StartOptions{}
+	err := c.client.ContainerStart(ctx, containerId, containerStartOptions)
 	if err != nil {
 		return err
 	}
-	defer cli.Close()
 
-	buildContextRaw := make([]byte, 0)
-	buildContext := bytes.NewReader(buildContextRaw)
-	imageBuildResponse, err := cli.ImageBuild(ctx, buildContext, types.ImageBuildOptions{})
+	containerLogsOptions := container.LogsOptions{ShowStdout: true, Follow: true}
+	out, err := c.client.ContainerLogs(ctx, containerId, containerLogsOptions)
+	if err != nil {
+		return err
+	}
+
+	_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 	if err != nil {
 		return err
 	}
